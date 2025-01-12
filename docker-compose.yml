@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  postgresql:
+    image: postgres
+    container_name: TRTG
+    ports:
+      - '5435:5432'
+    environment:
+      - POSTGRES_HOST=localhost
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=prismatest
+    command: postgres
+    restart: always
