@@ -12,7 +12,7 @@ model User {
   email          String           @unique
   name           String
   password       String
-  wallet         Float
+  wallet         Float            @default(0)
   payment        Payment[]
   SuccessPayment SuccessPayment[]
   FailedPayment  FailedPayment[]
