@@ -15,3 +15,10 @@ export class LoginUserDto {
     @IsString()
     password: string
 }
+
+export interface DataPoint {
+    coin: string;
+    fundingRate: string;
+    premium: string;
+    time: number;
+}

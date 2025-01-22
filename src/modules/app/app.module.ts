@@ -4,6 +4,7 @@ import configuration from 'src/configuration';
 import { TokenModule } from '../token/token.module';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
+import { HypeModule } from '../hype/hype.module';
 
 
 @Module({
@@ -13,7 +14,10 @@ import { UsersModule } from '../users/users.module';
   }),
     TokenModule,
     AuthModule,
-    UsersModule],
+    UsersModule,
+    HypeModule,
+  ],
+
   controllers: [],
   providers: [],
 })
