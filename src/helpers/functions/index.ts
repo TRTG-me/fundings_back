@@ -1,4 +1,4 @@
-import { IAllBdResult, IDataCByCoins } from "src/common/interfaces/auth";
+import { IAllBdResult, IcalcBest, IDataCByCoins } from "src/common/interfaces/auth";
 
 // Функция для получения самой старой записи по символу
 export async function oldRecord(data: string[], prisma: any): Promise<any[]> {
@@ -146,8 +146,8 @@ export function parseALL(AllBd: { id: number, coin: string, rate: number, date: 
 
 }
 
-export function calcBest(result: IAllBdResult[], koef: number[]) {
-    const a1 = result
+export function calcBest(result: IAllBdResult[], koef: number[]): IcalcBest[] {
+    const calcBest = result
         .map(element => {
 
             const calcGood = (element: number, k: number) => element < 0 ? "NO DATA" : element > k ? 'GOOD' : 'BAD'
@@ -164,7 +164,7 @@ export function calcBest(result: IAllBdResult[], koef: number[]) {
 
             }
         })
-    console.log(a1)
+    return calcBest
 }
 
 

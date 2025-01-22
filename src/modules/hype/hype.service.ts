@@ -67,8 +67,8 @@ export class HypeService {
             await Promise.all(promises);
             const AllBd: { id: number, coin: string, rate: number, date: number }[] = await FindAllBd(this.prisma)
             const result = parseALL(AllBd, coins)
-            console.log(result)
-            calcBest(result, koef)
+            const calc = calcBest(result, koef)
+            return [result, calc]
         } catch (e) {
             throw new Error(e)
         }

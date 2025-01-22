@@ -47,4 +47,15 @@ export interface IAllBdResult {
     last60Days: number
 }
 
+export interface IcalcBest {
 
+    coin: string,
+    days1goodORbad: string,
+    days3goodORbad: string,
+    days7goodORbad: string,
+    days14goodORbad: string,
+    days30goodORbad: string,
+    days60goodORbad: string,
+
+
+}
