@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { instanceHype } from 'src/helpers/axios';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { firstValueFrom } from 'rxjs';
+import { elementAt, firstValueFrom } from 'rxjs';
 import { calcBest, DataCountByCoins, deleteOldRecords, FindAllBd, getSorted, parseALL } from 'src/helpers/functions';
-import { IBinData, IDataCByCoins, IHypeDAta } from 'src/common/interfaces/auth';
+import { IAllBdResult, IBinData, IcalcBest, IDataCByCoins, IHypeDAta } from 'src/common/interfaces/auth';
 
 
 @Injectable()
@@ -16,7 +16,7 @@ export class HypeService {
 
     public days = this.configService.get('days')
 
-    public async hypeFundingRate(dayP: number, coins: string[][], koef: number[]): Promise<any> {
+    public async hypeFundingRate(dayP: number, coins: string[][], koef: number[]): Promise<[IAllBdResult[], IcalcBest[]]> {
         try {
 
             console.log(coins)
@@ -99,52 +99,55 @@ export class HypeService {
 
     private async mainFunction(symbolB: string, symbolH: string, timeStart: number, timeEnd: number, hours: number) {
         const arr = []
-        const url = `https://fapi.binance.com/fapi/v1/fundingRate?symbol=${symbolB}&startTime=${timeStart}&endTime=${timeEnd}`
-        const response = await firstValueFrom(this.httpService.get(url));
-        const bindata = response.data
-        console.log(response.data.length)
-        if (bindata.length === 0) { console.log("нет данных с бина") } else {
-            const timeHLstart = response.data[0].fundingTime - ((hours - 1) * 3600 * 1000 + 5000)
-            const timeHLend = response.data[response.data.length - 1].fundingTime + 5000
-            const payload = {
-                type: "fundingHistory",
-                coin: symbolH,
-                startTime: timeHLstart,
-                endTime: timeHLend
-            }
-            const hypedata = await instanceHype.post('', payload, {
-                headers: {
-                    'Content-type': 'application/json',
+        try {
+            const url = `https://fapi.binance.com/fapi/v1/fundingRate?symbol=${symbolB}&startTime=${timeStart}&endTime=${timeEnd}`
+            const response = await firstValueFrom(this.httpService.get(url));
+            const bindata = response.data
+
+            if (bindata.length === 0) { console.log("нет данных с бина") } else {
+                const timeHLstart = response.data[0].fundingTime - ((hours - 1) * 3600 * 1000 + 5000)
+                const timeHLend = response.data[response.data.length - 1].fundingTime + 5000
+                const payload = {
+                    type: "fundingHistory",
+                    coin: symbolH,
+                    startTime: timeHLstart,
+                    endTime: timeHLend
                 }
-            })
-
-            const hypeDataSum = this.sumHypeRates(hypedata.data, hours)
-            console.log("hype=", hypeDataSum.length, "bin=", bindata.length, "coin=", symbolH)
-            if (hypeDataSum.length !== bindata.length) {
-
-                console.log("пошла обрезка")
-                const [slicedHypeData, slicedBinData] = this.SliceArr(hypeDataSum, bindata);
-                const final = slicedBinData.map((item: IBinData, index: number) => (
-                    {
-                        fundingRate: (slicedHypeData[index].sum - parseFloat(item.fundingRate)).toFixed(6),
-                        date: item.fundingTime
+                const hypedata = await instanceHype.post('', payload, {
+                    headers: {
+                        'Content-type': 'application/json',
                     }
-                ))
+                })
 
-                await this.saveToDatabase(symbolH, final)
+                const hypeDataSum = this.sumHypeRates(hypedata.data, hours)
+                console.log("hype=", hypeDataSum.length, "bin=", bindata.length, "coin=", symbolH)
+                if (hypeDataSum.length !== bindata.length) {
 
-            } else {
+                    console.log("пошла обрезка")
+                    const [slicedHypeData, slicedBinData] = this.SliceArr(hypeDataSum, bindata);
+                    const final = slicedBinData.map((item: IBinData, index: number) => (
+                        {
+                            fundingRate: (slicedHypeData[index].sum - parseFloat(item.fundingRate)).toFixed(6),
+                            date: item.fundingTime
+                        }
+                    ))
+
+                    await this.saveToDatabase(symbolH, final)
+
+                } else {
 
 
-                const final = bindata.map((item: IBinData, index: number) => (
-                    {
-                        fundingRate: (hypeDataSum[index].sum - parseFloat(item.fundingRate)).toFixed(6),
-                        date: item.fundingTime
-                    }
-                ))
-                await this.saveToDatabase(symbolH, final)
-
+                    const final = bindata.map((item: IBinData, index: number) => (
+                        {
+                            fundingRate: (hypeDataSum[index].sum - parseFloat(item.fundingRate)).toFixed(6),
+                            date: item.fundingTime
+                        }
+                    ))
+                    await this.saveToDatabase(symbolH, final)
+                }
             }
+        } catch (e) {
+            throw new HttpException('Ошибка сервера', HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
     }
@@ -176,6 +179,31 @@ export class HypeService {
 
     public async deleteTable() {
         await this.prisma.$executeRawUnsafe(`TRUNCATE TABLE "fundings" RESTART IDENTITY CASCADE;`);
+    }
+
+    public async startBD(): Promise<[IAllBdResult[], IcalcBest[]]> {
+        const AllBd: { id: number, coin: string, rate: number, date: number }[] = await FindAllBd(this.prisma)
+
+        const coins = (await this.prisma.coins.findMany({
+            select: { bin: true, hype: true, hours: true }
+        }
+        )).map(element => [element.bin, element.hype, element.hours])
+
+        const koef = (await this.prisma.settings.findMany({
+            select: { value: true }
+        })).map(element => element.value)
+
+        const result = parseALL(AllBd, coins)
+        const calc = calcBest(result, koef)
+
+        return [result, calc]
+    }
+
+
+    public txtToArray(file: string): string[][] {
+        const lines = file.trim().split('\n');
+        const result = lines.map(line => line.trim().split(/\s+/));
+        return result;
     }
 }
 

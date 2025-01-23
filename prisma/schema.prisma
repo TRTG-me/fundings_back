@@ -20,3 +20,16 @@ model fundings {
   rate Float
   date Float
 }
+
+model coins {
+  id    Int    @id @default(autoincrement())
+  bin   String
+  hype  String
+  hours String
+}
+
+model settings {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value Float
+}

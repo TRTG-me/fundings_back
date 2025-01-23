@@ -66,7 +66,7 @@ export async function DataCountByCoins(coins: string[][], prisma: any): Promise<
 export function percentsPerDays(final: { fundingRate: string; date: number }[], coin: string) {
 
 }
-export async function FindAllBd(prisma: any) {
+export async function FindAllBd(prisma: any): Promise<{ id: number, coin: string, rate: number, date: number }[]> {
     const batchSize = 1000;
     let lastId = 0;
     let allData: any[] = [];
