@@ -11,8 +11,9 @@ export class HypeController {
     ) { }
 
     @Post('refresh')
-    async getFundingRate(@Body() body: { days: number, coins: string[][], koef: number[] }) {
-        return this.hypeService.hypeFundingRate(body.days, body.coins, body.koef);
+    async getFundingRate(@Body() body: { days: number }) {
+
+        return this.hypeService.hypeFundingRate(body.days);
     }
     @Get('deleteBD')
     async deleteTable() {

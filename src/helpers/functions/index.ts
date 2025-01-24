@@ -125,7 +125,7 @@ export function parseALL(AllBd: { id: number, coin: string, rate: number, date: 
             const getAverage = (days: number) =>
                 averages.length >= days
                     ? parseFloat((averages.slice(-days).reduce((acc, v) => acc + v, 0) / days).toFixed(2))
-                    : -1;
+                    : -777;
 
 
             return {

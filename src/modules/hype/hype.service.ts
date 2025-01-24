@@ -16,10 +16,22 @@ export class HypeService {
 
     public days = this.configService.get('days')
 
-    public async hypeFundingRate(dayP: number, coins: string[][], koef: number[]): Promise<[IAllBdResult[], IcalcBest[]]> {
+    public async hypeFundingRate(dayP: number): Promise<[IAllBdResult[], IcalcBest[]]> {
         try {
+            const coins = (await this.prisma.coins.findMany({
+                select: { bin: true, hype: true, hours: true }
+            }
+            )).map(element => [element.bin, element.hype, element.hours])
 
-            console.log(coins)
+            const order = ['1day', '3day', '7day', '14day', '30day', '60day'];
+            const settings = await this.prisma.settings.findMany({
+                select: { key: true, value: true }
+            })
+            const koef = settings
+                .filter(setting => order.includes(setting.key)) // Берём только нужные ключи
+                .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)) // Сортируем по `order`
+                .map(setting => setting.value); // Оставляем только `value`
+
             const coinsFunding = await DataCountByCoins(coins, this.prisma)
             const promises = coinsFunding.map(async (element: IDataCByCoins) => {
 
@@ -74,8 +86,6 @@ export class HypeService {
         }
 
     }
-
-
 
     public sumHypeRates(data: IHypeDAta[], size: number): { sum: number, time: number }[] {
 
@@ -183,15 +193,19 @@ export class HypeService {
 
     public async startBD(): Promise<[IAllBdResult[], IcalcBest[]]> {
         const AllBd: { id: number, coin: string, rate: number, date: number }[] = await FindAllBd(this.prisma)
-
+        const order = ['1day', '3day', '7day', '14day', '30day', '60day'];
         const coins = (await this.prisma.coins.findMany({
             select: { bin: true, hype: true, hours: true }
         }
         )).map(element => [element.bin, element.hype, element.hours])
 
-        const koef = (await this.prisma.settings.findMany({
-            select: { value: true }
-        })).map(element => element.value)
+        const settings = await this.prisma.settings.findMany({
+            select: { key: true, value: true }
+        })
+        const koef = settings
+            .filter(setting => order.includes(setting.key)) // Берём только нужные ключи
+            .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)) // Сортируем по `order`
+            .map(setting => setting.value); // Оставляем только `value`
 
         const result = parseALL(AllBd, coins)
         const calc = calcBest(result, koef)
