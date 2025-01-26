@@ -109,18 +109,21 @@ export function parseALL(AllBd: { id: number, coin: string, rate: number, date: 
         .map(group => {
             const matchingItem = arr.find(arrItem => arrItem[1] === group[0].coin);
             let h = parseFloat(matchingItem[2]) === 8 ? 3 : 6;
-
             const averages = [];
+            const dates = []
             for (let i = 0; i < group.length; i += h) {
                 const slice = group.slice(group.length - h - i, group.length - i);
                 const sum = parseFloat(slice.reduce((acc, value) => acc + value.rate, 0).toFixed(6));
                 if (slice.length > 0) {
                     const day = parseFloat((sum * 365 * 100).toFixed(2));
                     averages.unshift(day);
+                    const date = slice[slice.length - 1].date; // Берем дату первого элемента в срезе
+                    dates.unshift(date);
+
                 }
             }
             const hours = group.map(element => parseFloat((element.rate * 365 * h * 100).toFixed(2)))
-
+            const hoursDays = group.map(el => el.date)
             const lastDay = averages[averages.length - 1];
             const getAverage = (days: number) =>
                 averages.length >= days
@@ -131,7 +134,9 @@ export function parseALL(AllBd: { id: number, coin: string, rate: number, date: 
             return {
                 coin: group[0].coin,
                 hours: hours,
+                hoursDays: hoursDays,
                 days: averages,
+                dataDays: dates,
                 last1Day: lastDay,
                 last3Days: getAverage(3),
                 last7Days: getAverage(7),

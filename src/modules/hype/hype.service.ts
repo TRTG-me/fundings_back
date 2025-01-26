@@ -14,10 +14,9 @@ export class HypeService {
         private readonly httpService: HttpService,
         private readonly configService: ConfigService) { }
 
-    public days = this.configService.get('days')
-
     public async hypeFundingRate(dayP: number): Promise<[IAllBdResult[], IcalcBest[]]> {
         try {
+            console.log(dayP)
             const coins = (await this.prisma.coins.findMany({
                 select: { bin: true, hype: true, hours: true }
             }
@@ -137,7 +136,7 @@ export class HypeService {
                     const [slicedHypeData, slicedBinData] = this.SliceArr(hypeDataSum, bindata);
                     const final = slicedBinData.map((item: IBinData, index: number) => (
                         {
-                            fundingRate: (slicedHypeData[index].sum - parseFloat(item.fundingRate)).toFixed(6),
+                            fundingRate: (slicedHypeData[index].sum - parseFloat(item.fundingRate)).toFixed(8),
                             date: item.fundingTime
                         }
                     ))
@@ -149,7 +148,7 @@ export class HypeService {
 
                     const final = bindata.map((item: IBinData, index: number) => (
                         {
-                            fundingRate: (hypeDataSum[index].sum - parseFloat(item.fundingRate)).toFixed(6),
+                            fundingRate: (hypeDataSum[index].sum - parseFloat(item.fundingRate)).toFixed(8),
                             date: item.fundingTime
                         }
                     ))
