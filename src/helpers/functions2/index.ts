@@ -42,3 +42,26 @@ export async function saveSettingstoBd(arr: string[][], prisma: any) {
         });
     }
 }
+export async function saveFavoritesToBd(coin: string, prisma: any) {
+    if (coin) { }
+    await prisma.favorites.upsert({
+        where: { coin }, // Ищем запись по ключу
+        update: { coin: coin }, // Обновляем, если найдена
+        create: { coin: coin } // Создаём, если не найдена
+    });
+
+}
+export async function deleteFavoritesfromBd(coin: string, prisma: any) {
+
+    await prisma.favorites.delete({
+        where: { coin: coin }, // Ищем запись по ключу
+        // Создаём, если не найдена
+    });
+}
+export async function getFavorites(prisma: any) {
+    return await prisma.favorites.findMany({
+        select: { coin: true }
+    })
+
+}
+

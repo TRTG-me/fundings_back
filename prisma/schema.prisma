@@ -33,3 +33,8 @@ model settings {
   key   String @unique
   value Float
 }
+
+model favorites {
+  id   Int    @id @default(autoincrement())
+  coin String @unique
+}

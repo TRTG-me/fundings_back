@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, UploadedFile, UseInterceptors } from '@nes
 import { HypeService } from './hype.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PrismaService } from '../prisma/prisma.service';
-import { saveCoinstoBd, saveSettingstoBd } from 'src/helpers/functions2';
+import { deleteFavoritesfromBd, getFavorites, saveCoinstoBd, saveFavoritesToBd, saveSettingstoBd } from 'src/helpers/functions2';
 
 @Controller('')
 export class HypeController {
@@ -28,12 +28,29 @@ export class HypeController {
     async uploadCoinsFile(@UploadedFile() file: Express.Multer.File) {
         const result = this.hypeService.txtToArray(file.buffer.toString());
         await saveCoinstoBd(result, this.prisma)
-
     }
+
     @Post('uploadSettings')
     @UseInterceptors(FileInterceptor('file'))
     async uploadFile(@UploadedFile() file: Express.Multer.File) {
         const result = this.hypeService.txtToArray(file.buffer.toString());
         await saveSettingstoBd(result, this.prisma)
     }
+    @Post('addFavor')
+    async saveFavorites(@Body() body: { coin: string }) {
+        console.log(body)
+        saveFavoritesToBd(body.coin, this.prisma);
+    }
+    @Post('deleteFavor')
+    async deleteFavoritesfromBd(@Body() body: { coin: string }) {
+        deleteFavoritesfromBd(body.coin, this.prisma);
+    }
+
+    @Get('getFavorites')
+    async getFavorites() {
+        return await getFavorites(this.prisma);
+    }
+
 }
+
+

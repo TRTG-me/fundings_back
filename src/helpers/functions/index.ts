@@ -155,7 +155,7 @@ export function calcBest(result: IAllBdResult[], koef: number[]): IcalcBest[] {
     const calcBest = result
         .map(element => {
 
-            const calcGood = (element: number, k: number) => element < 0 ? "NO DATA" : element > k ? 'GOOD' : 'BAD'
+            const calcGood = (element: number, k: number) => element === -777 ? "NO DATA" : element > k ? 'GOOD' : 'BAD'
 
 
             return {
