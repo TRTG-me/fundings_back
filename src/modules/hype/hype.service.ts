@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { elementAt, firstValueFrom } from 'rxjs';
 import { calcBest, DataCountByCoins, deleteOldRecords, FindAllBd, getSorted, parseALL } from 'src/helpers/functions';
 import { IAllBdResult, IBinData, IcalcBest, IDataCByCoins, IHypeDAta } from 'src/common/interfaces/auth';
+import { calcBestToFront, getKoef, getSettings } from 'src/helpers/functions2';
 
 
 @Injectable()
@@ -22,14 +23,7 @@ export class HypeService {
             }
             )).map(element => [element.bin, element.hype, element.hours])
 
-            const order = ['1day', '3day', '7day', '14day', '30day', '60day'];
-            const settings = await this.prisma.settings.findMany({
-                select: { key: true, value: true }
-            })
-            const koef = settings
-                .filter(setting => order.includes(setting.key)) // Берём только нужные ключи
-                .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)) // Сортируем по `order`
-                .map(setting => setting.value); // Оставляем только `value`
+            const parse = await getKoef(this.prisma)
 
             const coinsFunding = await DataCountByCoins(coins, this.prisma)
             const promises = coinsFunding.map(async (element: IDataCByCoins) => {
@@ -77,9 +71,12 @@ export class HypeService {
             })
             await Promise.all(promises);
             const AllBd: { id: number, coin: string, rate: number, date: number }[] = await FindAllBd(this.prisma)
+
             const result = parseALL(AllBd, coins)
-            const calc = calcBest(result, koef)
-            return [result, calc]
+            const calc = calcBest(result, parse.koef)
+            const res = calcBestToFront(result, calc)
+
+            return [res.filteredArray, res.calcRes]
         } catch (e) {
             throw new Error(e)
         }
@@ -192,26 +189,20 @@ export class HypeService {
 
     public async startBD(): Promise<[IAllBdResult[], IcalcBest[]]> {
         const AllBd: { id: number, coin: string, rate: number, date: number }[] = await FindAllBd(this.prisma)
-        const order = ['1day', '3day', '7day', '14day', '30day', '60day'];
+
         const coins = (await this.prisma.coins.findMany({
             select: { bin: true, hype: true, hours: true }
         }
         )).map(element => [element.bin, element.hype, element.hours])
 
-        const settings = await this.prisma.settings.findMany({
-            select: { key: true, value: true }
-        })
-        const koef = settings
-            .filter(setting => order.includes(setting.key)) // Берём только нужные ключи
-            .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)) // Сортируем по `order`
-            .map(setting => setting.value); // Оставляем только `value`
+
+        const parse = await getKoef(this.prisma)
 
         const result = parseALL(AllBd, coins)
-        const calc = calcBest(result, koef)
-
-        return [result, calc]
+        const calc = calcBest(result, parse.koef)
+        const res = calcBestToFront(result, calc)
+        return [res.filteredArray, res.calcRes]
     }
-
 
     public txtToArray(file: string): string[][] {
         const lines = file.trim().split('\n');

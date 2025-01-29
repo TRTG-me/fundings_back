@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, UploadedFile, UseInterceptors } from '@nes
 import { HypeService } from './hype.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PrismaService } from '../prisma/prisma.service';
-import { deleteFavoritesfromBd, getFavorites, saveCoinstoBd, saveFavoritesToBd, saveSettingstoBd } from 'src/helpers/functions2';
+import { deleteFavoritesfromBd, getCoins, getFavorites, getKoef, getSettings, getSingle, saveCoinstoBd, saveFavoritesToBd, saveSettingstoBd } from 'src/helpers/functions2';
 
 @Controller('')
 export class HypeController {
@@ -11,8 +11,9 @@ export class HypeController {
     ) { }
 
     @Post('refresh')
-    async getFundingRate(@Body() body: { days: number }) {
-
+    async getFundingRate(@Body() body: { days: number, updatedSettings: { key: string, value: string }[] }) {
+        const settings = body.updatedSettings.map(value => [value.key, value.value])
+        await saveSettingstoBd(settings, this.prisma)
         return this.hypeService.hypeFundingRate(body.days);
     }
     @Get('deleteBD')
@@ -34,11 +35,11 @@ export class HypeController {
     @UseInterceptors(FileInterceptor('file'))
     async uploadFile(@UploadedFile() file: Express.Multer.File) {
         const result = this.hypeService.txtToArray(file.buffer.toString());
+        console.log(result)
         await saveSettingstoBd(result, this.prisma)
     }
     @Post('addFavor')
     async saveFavorites(@Body() body: { coin: string }) {
-        console.log(body)
         saveFavoritesToBd(body.coin, this.prisma);
     }
     @Post('deleteFavor')
@@ -51,6 +52,20 @@ export class HypeController {
         return await getFavorites(this.prisma);
     }
 
+    @Post('singleElement')
+    async getSingleElement(@Body() body: { coin: string }) {
+        return await getSingle(body.coin, this.prisma)
+    }
+    @Get('getCoins')
+    async getCoins() {
+        return await getCoins(this.prisma)
+    }
+    @Get('getSettings')
+    async getSettings() {
+        const parse = await getKoef(this.prisma)
+        return parse.settings
+    }
 }
+
 
 
