@@ -63,9 +63,6 @@ export async function DataCountByCoins(coins: string[][], prisma: any): Promise<
     return records
 }
 
-export function percentsPerDays(final: { fundingRate: string; date: number }[], coin: string) {
-
-}
 export async function FindAllBd(prisma: any): Promise<{ id: number, coin: string, rate: number, date: number }[]> {
     const batchSize = 1000;
     let lastId = 0;
@@ -156,7 +153,6 @@ export function calcBest(result: IAllBdResult[], koef: number[]): IcalcBest[] {
         .map(element => {
 
             const calcGood = (element: number, k: number) => element === -777 ? "NO DATA" : element > k ? 'GOOD' : 'BAD'
-
 
             return {
                 coin: element.coin,

@@ -21,6 +21,13 @@ model fundings {
   date Float
 }
 
+model fundingsTest {
+  id   Int    @id @default(autoincrement())
+  coin String
+  rate Float
+  date Float
+}
+
 model coins {
   id    Int    @id @default(autoincrement())
   bin   String

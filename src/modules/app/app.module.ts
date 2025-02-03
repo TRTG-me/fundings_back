@@ -5,6 +5,7 @@ import { TokenModule } from '../token/token.module';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
 import { HypeModule } from '../hype/hype.module';
+import { ProxiModule } from '../proxi/proxi.module';
 
 
 @Module({
@@ -16,6 +17,7 @@ import { HypeModule } from '../hype/hype.module';
     AuthModule,
     UsersModule,
     HypeModule,
+    ProxiModule
   ],
 
   controllers: [],

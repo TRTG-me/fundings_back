@@ -1,5 +1,5 @@
 import { IAllBdResult, IcalcBest } from "src/common/interfaces/auth";
-import { calcBest, FindAllBd, parseALL } from "../functions";
+import { calcBest, parseALL } from "../functions";
 
 export async function saveCoinstoBd(arr: string[][], prisma: any) {
     const existingBins = new Set<string>();
@@ -8,17 +8,25 @@ export async function saveCoinstoBd(arr: string[][], prisma: any) {
     const existingCoins = await prisma.coins.findMany({
         select: { bin: true }
     });
-    console.log(existingCoins)
-    // Добавляем существующие значения bin в множество
-    existingCoins.forEach((coin: { bin: string }) => existingBins.add(coin.bin));
+    // 2. Добавляем только непустые bin в множество
+    existingCoins.forEach((coin: { bin: string | null }) => {
+        if (coin.bin) existingBins.add(coin.bin);
+    });
 
-    // Фильтруем массив, чтобы оставить только уникальные строки по колонке bin
-    const uniqueItems = arr.filter(item => !existingBins.has(item[0]));
+    // 3. Фильтруем массив от дубликатов внутри самого arr
+    const uniqueItems = Array.from(new Map(arr.map(item => [item[0], item])).values());
+
+    // 4. Убираем элементы, которые уже есть в БД
+    const newItems = uniqueItems.filter(item => !existingBins.has(item[0]));
+
+    if (newItems.length === 0) {
+        console.log("Нет новых данных для сохранения");
+        return;
+    }
 
     try {
-
         await prisma.$transaction(
-            uniqueItems.map(item =>
+            newItems.map(item =>
                 prisma.coins.create({
                     data: {
                         bin: item[0],
@@ -44,6 +52,7 @@ export async function saveSettingstoBd(arr: string[][], prisma: any) {
         });
     }
 }
+
 export async function saveFavoritesToBd(coin: string, prisma: any) {
     if (coin) { }
     await prisma.favorites.upsert({
@@ -54,14 +63,14 @@ export async function saveFavoritesToBd(coin: string, prisma: any) {
 
 }
 export async function deleteFavoritesfromBd(coin: string, prisma: any) {
-
     await prisma.favorites.delete({
         where: { coin: coin }, // Ищем запись по ключу
         // Создаём, если не найдена
     });
 }
+
 export async function getFavorites(prisma: any) {
-    const coins = await prisma.favorites.findMany({
+    const coins: { coin: string }[] = await prisma.favorites.findMany({
         select: { coin: true }
     })
     const coinNames = coins.map(c => c.coin);
@@ -82,7 +91,7 @@ export async function getFavorites(prisma: any) {
     });
 
     const order = ['1Day', '3Days', '7Days', '14Days', '30Days', '60Days'];
-    const settings = await prisma.settings.findMany({
+    const settings: { key: string, value: number }[] = await prisma.settings.findMany({
         select: { key: true, value: true }
     })
     const koef = settings
@@ -90,7 +99,7 @@ export async function getFavorites(prisma: any) {
         .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key)) // Сортируем по `order`
         .map(setting => setting.value); // Оставляем только `value`
 
-    const formattedCoins: string[][] = coinsData.map(c => [c.bin, c.hype, c.hours]);
+    const formattedCoins: string[][] = coinsData.map((c: { bin: string, hype: string, hours: string }) => [c.bin, c.hype, c.hours]);
 
 
     const result = parseALL(BD, formattedCoins)
@@ -99,15 +108,13 @@ export async function getFavorites(prisma: any) {
 
 }
 
-
-
 export function calcBestToFront(result: IAllBdResult[], calc: IcalcBest[]) {
     const filteredArray = result.filter(singleCoin =>
         calc.some(data =>
             data.coin === singleCoin.coin &&
-            data.days1goodORbad === "GOOD" &&
-            data.days3goodORbad === "GOOD" &&
-            data.days7goodORbad === "GOOD"
+            (data.days1goodORbad === "GOOD" || data.days1goodORbad === "NO DATA") &&
+            (data.days3goodORbad === "GOOD" || data.days3goodORbad === "NO DATA") &&
+            (data.days7goodORbad === "GOOD" || data.days7goodORbad === "NO DATA")
         )
     );
     const calcRes = calc.filter(coin =>
@@ -115,19 +122,7 @@ export function calcBestToFront(result: IAllBdResult[], calc: IcalcBest[]) {
             data.coin === coin.coin
         )
     )
-
-    // const Filtered = filteredArray
-    //     .map(element => ({
-    //         coin: element.coin,
-    //         last1Day: element.last1Day,
-    //         last3Days: element.last3Days,
-    //         last7Days: element.last7Days,
-    //         last14Days: element.last14Days,
-    //         last30Days: element.last30Days,
-    //         last60Days: element.last60Days,
-    //     }))
     return { filteredArray, calcRes }
-
 }
 
 export async function getSingle(coin: string, prisma: any) {
@@ -142,12 +137,11 @@ export async function getSingle(coin: string, prisma: any) {
     const BD = await prisma.fundings.findMany({
         where: {
             coin: coin
-            // Фильтруем по массиву монет
         },
 
     });
 
-    const formattedCoins: string[][] = coinsData.map(c => [c.bin, c.hype, c.hours]);
+    const formattedCoins: string[][] = coinsData.map((c: { bin: string, hype: string, hours: string }) => [c.bin, c.hype, c.hours]);
     const parse = await getKoef(prisma)
     const result = parseALL(BD, formattedCoins)
     const calc = calcBest(result, parse.koef)
@@ -157,9 +151,8 @@ export async function getSingle(coin: string, prisma: any) {
 
 export async function getCoins(prisma: any) {
     const arr = await prisma.coins.findMany({
-        select: { hype: true }
     });
-    return (arr.map(el => el.hype))
+    return (arr.map(el => [el.bin, el.hype,]))
 }
 
 export async function getSettings(prisma: any) {
@@ -168,9 +161,9 @@ export async function getSettings(prisma: any) {
     });
 
 }
-export async function getKoef(prisma: any) {
+export async function getKoef(prisma: any): Promise<{ koef: number[], settings: { key: string, value: number }[] }> {
     const order = ['1Day', '3Days', '7Days', '14Days', '30Days', '60Days'];
-    const parse = await prisma.settings.findMany({
+    const parse: { key: string, value: number }[] = await prisma.settings.findMany({
         select: { key: true, value: true }
     })
     const settings = parse

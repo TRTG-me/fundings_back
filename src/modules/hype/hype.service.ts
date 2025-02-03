@@ -1,12 +1,12 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { instanceHype } from 'src/helpers/axios';
+import { generateProxyConfig, instanceHype } from 'src/helpers/axios';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { elementAt, firstValueFrom } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import { calcBest, DataCountByCoins, deleteOldRecords, FindAllBd, getSorted, parseALL } from 'src/helpers/functions';
 import { IAllBdResult, IBinData, IcalcBest, IDataCByCoins, IHypeDAta } from 'src/common/interfaces/auth';
-import { calcBestToFront, getKoef, getSettings } from 'src/helpers/functions2';
+import { calcBestToFront, getKoef } from 'src/helpers/functions2';
 
 
 @Injectable()
@@ -14,10 +14,11 @@ export class HypeService {
     constructor(private readonly prisma: PrismaService,
         private readonly httpService: HttpService,
         private readonly configService: ConfigService) { }
+    private portCounter = new Map<number, number>();
+
 
     public async hypeFundingRate(dayP: number): Promise<[IAllBdResult[], IcalcBest[]]> {
         try {
-            console.log(dayP)
             const coins = (await this.prisma.coins.findMany({
                 select: { bin: true, hype: true, hours: true }
             }
@@ -26,7 +27,7 @@ export class HypeService {
             const parse = await getKoef(this.prisma)
 
             const coinsFunding = await DataCountByCoins(coins, this.prisma)
-            const promises = coinsFunding.map(async (element: IDataCByCoins) => {
+            const promises = coinsFunding.map(async (element: IDataCByCoins, index: number) => {
 
                 if (element.count !== 0) {
 
@@ -43,7 +44,7 @@ export class HypeService {
                         const timeStart = lastValue + 5000
                         const timeEnd = Date.now()
                         console.log("пора обновить", element.symbolH)
-                        await this.mainFunction(element.symbolB, element.symbolH, timeStart, timeEnd, element.hours)
+                        await this.mainFunction(element.symbolB, element.symbolH, timeStart, timeEnd, element.hours, index)
                     }
                     else { console.log("данные актуальные", element.symbolH) }
                 }
@@ -55,17 +56,13 @@ export class HypeService {
                         for (let i = 0; i < Math.ceil(dayP / 15); i++) {
                             const timeStart = now - 86400000 * (dayP - i * 15);
                             const timeEnd = (dayP - (i + 1) * 15 <= 0) ? now : now - 86400000 * (dayP - (i + 1) * 15);
-                            subPromises.push(await this.mainFunction(element.symbolB, element.symbolH, timeStart, timeEnd, element.hours))
-
+                            subPromises.push(await this.mainFunction(element.symbolB, element.symbolH, timeStart, timeEnd, element.hours, index))
                         }
-
                     }
                     else {
                         const timeStart = now - 86400000 * dayP
                         const timeEnd = now
-                        await this.mainFunction(element.symbolB, element.symbolH, timeStart, timeEnd, element.hours)
-
-
+                        await this.mainFunction(element.symbolB, element.symbolH, timeStart, timeEnd, element.hours, index)
                     }
                 }
             })
@@ -80,9 +77,7 @@ export class HypeService {
         } catch (e) {
             throw new Error(e)
         }
-
     }
-
     public sumHypeRates(data: IHypeDAta[], size: number): { sum: number, time: number }[] {
 
         const newArr = data.map((element) => ({
@@ -103,59 +98,77 @@ export class HypeService {
         return averages
     }
 
-    private async mainFunction(symbolB: string, symbolH: string, timeStart: number, timeEnd: number, hours: number) {
-        const arr = []
+    private async mainFunction(symbolB: string, symbolH: string, timeStart: number, timeEnd: number, hours: number, index: number) {
         try {
-            const url = `https://fapi.binance.com/fapi/v1/fundingRate?symbol=${symbolB}&startTime=${timeStart}&endTime=${timeEnd}`
+            const url = `https://fapi.binance.com/fapi/v1/fundingRate?symbol=${symbolB}&startTime=${timeStart}&endTime=${timeEnd}`;
             const response = await firstValueFrom(this.httpService.get(url));
-            const bindata = response.data
+            const bindata = response.data;
 
-            if (bindata.length === 0) { console.log("нет данных с бина") } else {
-                const timeHLstart = response.data[0].fundingTime - ((hours - 1) * 3600 * 1000 + 5000)
-                const timeHLend = response.data[response.data.length - 1].fundingTime + 5000
-                const payload = {
-                    type: "fundingHistory",
-                    coin: symbolH,
-                    startTime: timeHLstart,
-                    endTime: timeHLend
-                }
-                const hypedata = await instanceHype.post('', payload, {
-                    headers: {
-                        'Content-type': 'application/json',
-                    }
-                })
+            if (bindata.length === 0) {
+                console.log("COIN:", symbolB, "нет данных с Binance");
+                return;
+            }
 
-                const hypeDataSum = this.sumHypeRates(hypedata.data, hours)
-                console.log("hype=", hypeDataSum.length, "bin=", bindata.length, "coin=", symbolH)
-                if (hypeDataSum.length !== bindata.length) {
+            // 2️⃣ Формируем данные для запроса к Hyperliquid
+            const timeHLstart = response.data[0].fundingTime - ((hours - 1) * 3600 * 1000 + 5000);
+            const timeHLend = response.data[response.data.length - 1].fundingTime + 5000;
+            const payload = {
+                type: "fundingHistory",
+                coin: symbolH,
+                startTime: timeHLstart,
+                endTime: timeHLend
+            };
 
-                    console.log("пошла обрезка")
-                    const [slicedHypeData, slicedBinData] = this.SliceArr(hypeDataSum, bindata);
-                    const final = slicedBinData.map((item: IBinData, index: number) => (
-                        {
+            let retryCount = 0;
+            let port = 11020 + Math.floor(index / 1);
+            const MAX_RETRIES = 6;
+
+            // 3️⃣ ДЕЛАЕМ ЗАПРОС К HYPERLIQUID (ПОВТОРЯЕМ ПРИ ОШИБКЕ)
+            while (retryCount < MAX_RETRIES) {
+                try {
+                    const hypedata = await instanceHype.post('', payload, {
+                        headers: { 'Content-type': 'application/json' },
+                        proxy: generateProxyConfig(port),
+                        timeout: 6000, // Уменьшаем таймаут до 7 секунд
+                    });
+
+                    // Логируем успешный запрос
+                    const currentCount = this.portCounter.get(port) || 0;
+                    this.portCounter.set(port, currentCount + 1);
+                    console.log(`Запрос через порт ${port}, всего запросов: ${this.portCounter.get(port)}`);
+
+                    // 4️⃣ Обрабатываем данные и сохраняем
+                    const hypeDataSum = this.sumHypeRates(hypedata.data, hours);
+                    let final;
+
+                    if (hypeDataSum.length !== bindata.length) {
+                        const [slicedHypeData, slicedBinData] = this.SliceArr(hypeDataSum, bindata);
+                        final = slicedBinData.map((item: IBinData, index: number) => ({
                             fundingRate: (slicedHypeData[index].sum - parseFloat(item.fundingRate)).toFixed(8),
                             date: item.fundingTime
-                        }
-                    ))
-
-                    await this.saveToDatabase(symbolH, final)
-
-                } else {
-
-
-                    const final = bindata.map((item: IBinData, index: number) => (
-                        {
+                        }));
+                    } else {
+                        final = bindata.map((item: IBinData, index: number) => ({
                             fundingRate: (hypeDataSum[index].sum - parseFloat(item.fundingRate)).toFixed(8),
                             date: item.fundingTime
-                        }
-                    ))
-                    await this.saveToDatabase(symbolH, final)
+                        }));
+                    }
+
+                    await this.saveToDatabase(symbolH, final);
+                    return; // Успешное выполнение, выходим из цикла
+                } catch (error) {
+                    console.error(`Ошибка запроса к Hyperliquid (попытка ${retryCount + 1}/${MAX_RETRIES}):`, error.message);
+                    retryCount++;
+                    port += 20 + (retryCount - 1); // Следующая попытка: +40, +41, +42...
+                    console.log(`Повтор запроса к Hyperliquid с новым портом: ${port}`);
+
                 }
             }
-        } catch (e) {
-            throw new HttpException('Ошибка сервера', HttpStatus.INTERNAL_SERVER_ERROR);
-        }
 
+            console.error(`mainFunction завершилась неудачно после ${MAX_RETRIES} попыток.`);
+        } catch (e) {
+            console.error('Ошибка в mainFunction (Binance запрос):', e.message, symbolH, index);
+        }
     }
 
     private SliceArr(arr1: { sum: number, time: number }[], arr2: IBinData[]): [{ sum: number, time: number }[], IBinData[]] {
