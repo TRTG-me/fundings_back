@@ -59,11 +59,17 @@ export class HypeController {
     @Get('getCoins')
     async getCoins() {
         return await getCoins(this.prisma)
+
     }
     @Get('getSettings')
     async getSettings() {
         const parse = await getKoef(this.prisma)
         return parse.settings
+    }
+    @Get('getTest')
+    async gettest() {
+        return await this.hypeService.sdk()
+
     }
 }
 

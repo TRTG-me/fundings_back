@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { calcBest, DataCountByCoins, deleteOldRecords, FindAllBd, getSorted, parseALL } from 'src/helpers/functions';
 import { IAllBdResult, IBinData, IcalcBest, IDataCByCoins, IHypeDAta } from 'src/common/interfaces/auth';
 import { calcBestToFront, getKoef } from 'src/helpers/functions2';
+const { Hyperliquid } = require('hyperliquid');
 
 
 @Injectable()
@@ -16,6 +17,31 @@ export class HypeService {
         private readonly configService: ConfigService) { }
     private portCounter = new Map<number, number>();
 
+    public async sdk() {
+        const sdk = new Hyperliquid({
+            enableWs: false, // boolean (OPTIONAL) - Enable/disable WebSocket functionality, defaults to true
+            privateKey: '0x40cd5bbe7c21f991bac70a1d682b7c92c4c69277a7633bbfbdcea95ae86a1d25',
+            testnet: true,
+            walletAddress: "0xAF38395B3c9836aa447C93936176d9Fd16473B21"
+
+        });
+
+        await sdk.initialize(); // Инициализация
+
+        sdk.exchange.placeOrder({
+            coin: 'SUI-PERP',
+            is_buy: true,
+            sz: 20,
+            limit_px: 10,
+            order_type: { limit: { tif: 'Gtc' } },
+            reduce_only: false,
+            //vaultAddress: '0x...' // optional
+        }).then(placeOrderResult => {
+            console.log(placeOrderResult);
+        }).catch(error => {
+            console.error('Error placing order:', error);
+        });
+    }
 
     public async hypeFundingRate(dayP: number): Promise<[IAllBdResult[], IcalcBest[]]> {
         try {
@@ -120,7 +146,7 @@ export class HypeService {
             };
 
             let retryCount = 0;
-            let port = 11020 + Math.floor(index / 1);
+            let port = 11001 + Math.floor(index / 1);
             const MAX_RETRIES = 6;
 
             // 3️⃣ ДЕЛАЕМ ЗАПРОС К HYPERLIQUID (ПОВТОРЯЕМ ПРИ ОШИБКЕ)
@@ -159,7 +185,7 @@ export class HypeService {
                 } catch (error) {
                     console.error(`Ошибка запроса к Hyperliquid (попытка ${retryCount + 1}/${MAX_RETRIES}):`, error.message);
                     retryCount++;
-                    port += 20 + (retryCount - 1); // Следующая попытка: +40, +41, +42...
+                    port += 20 + (retryCount - 1);
                     console.log(`Повтор запроса к Hyperliquid с новым портом: ${port}`);
 
                 }

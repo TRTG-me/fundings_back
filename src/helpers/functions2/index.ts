@@ -152,7 +152,7 @@ export async function getSingle(coin: string, prisma: any) {
 export async function getCoins(prisma: any) {
     const arr = await prisma.coins.findMany({
     });
-    return (arr.map(el => [el.bin, el.hype,]))
+    return (arr.map(el => [el.bin, el.hype, el.hours]))
 }
 
 export async function getSettings(prisma: any) {
