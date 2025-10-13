@@ -6,6 +6,7 @@ import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
 import { HypeModule } from '../hype/hype.module';
 import { ProxiModule } from '../proxi/proxi.module';
+import { BinapiModule } from '../binapi/binapi.module';
 
 
 @Module({
@@ -17,7 +18,8 @@ import { ProxiModule } from '../proxi/proxi.module';
     AuthModule,
     UsersModule,
     HypeModule,
-    ProxiModule
+    ProxiModule,
+    BinapiModule
   ],
 
   controllers: [],

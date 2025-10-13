@@ -57,5 +57,24 @@ export interface IcalcBest {
     days30goodORbad: string,
     days60goodORbad: string,
 
-
 }
+export interface FuturesPositionResponse {
+    symbol: string;
+    positionSide: string;
+    positionAmt: string;
+    entryPrice: string;
+    breakEvenPrice: string;
+    markPrice: string;
+    unRealizedProfit: string;
+    liquidationPrice: string;
+    isolatedMargin: string;
+    notional: string;
+    marginAsset: string;
+    isolatedWallet: string;
+    initialMargin: string;
+    maintMargin: string;
+    positionInitialMargin: string;
+    openOrderInitialMargin: string;
+    adl: number;
+}
+
