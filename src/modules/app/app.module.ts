@@ -7,6 +7,8 @@ import { UsersModule } from '../users/users.module';
 import { HypeModule } from '../hype/hype.module';
 import { ProxiModule } from '../proxi/proxi.module';
 import { BinapiModule } from '../binapi/binapi.module';
+import { GetInfoModule } from '../get-info-paradex/get-info.module';
+import { GetInfoExtendModule } from '../get-info-extend/get-info-extend.module';
 
 
 @Module({
@@ -19,7 +21,9 @@ import { BinapiModule } from '../binapi/binapi.module';
     UsersModule,
     HypeModule,
     ProxiModule,
-    BinapiModule
+    BinapiModule,
+    GetInfoModule,
+    GetInfoExtendModule
   ],
 
   controllers: [],
